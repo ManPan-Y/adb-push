@@ -5,6 +5,10 @@
 Push local files or folders to an Android device over ADB wireless debugging, and pull them back.
 Pure Python standard library + a Tkinter GUI. No `pip install` required.
 
+**No command line, no adb commands to remember.** Unzip and double-click `adb-push-gui.exe` (portable build)
+or `启动GUI.bat` (source), then pick your files and hit start — the device folder is picked in the GUI too.
+The CLI options are only there for people who want them.
+
 > **Free for personal use — no permission needed.**
 > Personal study, research, hobby projects and non-profit organizations may use and modify it freely.
 > Only **commercial use** (reselling, paid services, integration into a commercial product, etc.)
