@@ -5,8 +5,9 @@
 Push local files or folders to an Android device over ADB wireless debugging, and pull them back.
 Pure Python standard library + a Tkinter GUI. No `pip install` required.
 
-**No command line, no adb commands to remember.** Unzip and double-click `adb-push-gui.exe` (portable build)
-or `启动GUI.bat` (source), then pick your files and hit start — the device folder is picked in the GUI too.
+**No command line, no adb commands to remember.** The portable build (**Python and ADB both included**)
+only needs to be unzipped and `adb-push-gui.exe` double-clicked; from source, run `启动GUI.bat`.
+Then pick your files and hit start — the device folder is picked in the GUI too.
 The CLI options are only there for people who want them.
 
 > **Free for personal use — no permission needed.**
@@ -18,10 +19,10 @@ The CLI options are only there for people who want them.
 
 | Package | For | Notes |
 | --- | --- | --- |
-| **`adb-push-v1.0.0-win64.zip`** (portable) | Most users | Bundled `.exe`, **no Python needed**, just unzip and run |
-| **`adb-push-v1.0.0.zip`** / clone | Developers | Requires Python 3.10+ |
+| **`adb-push-v1.0.0-win64.zip`** (portable) | Most users | Ships the `.exe` **and ADB** — no Python, no separate adb install, just unzip and run |
+| **`adb-push-v1.0.0.zip`** / clone | Developers | Requires Python 3.10+ and your own ADB |
 
-Both are on the [Releases](https://github.com/0701QYhong/adb-push/releases/latest) page. Either way you still need **ADB** (below).
+Both are on the [Releases](https://github.com/0701QYhong/adb-push/releases/latest) page.
 
 ## Features
 
@@ -38,12 +39,14 @@ Both are on the [Releases](https://github.com/0701QYhong/adb-push/releases/lates
 
 ## Requirements
 
-1. **ADB**: <https://developer.android.com/tools/releases/platform-tools>
-2. **Python 3.10+** (source package only — skip this if you use the portable build). No third-party packages.
+- **Portable build: install nothing.** ADB is bundled. Unzip anywhere and run `adb-push-gui.exe`.
+- **Source build**: **Python 3.10+** (no third-party packages) plus your own **ADB**: <https://developer.android.com/tools/releases/platform-tools>
 
-`adb` is located automatically in this order: the `--adb` argument → the `ADB_PATH` environment variable → the system `PATH` → a `platform-tools/` folder next to the program or in a parent directory.
+In the source build, `adb` is located automatically in this order: the `--adb` argument → the `ADB_PATH` environment variable → the system `PATH` → a `platform-tools/` folder next to the program or in a parent directory.
 
 > Easiest setup: drop the extracted `platform-tools` folder right next to the `.exe` — it will be found automatically.
+>
+> The `platform-tools` folder inside the portable build is an unmodified copy of Google's official release; see `platform-tools/NOTICE.txt` for its copyright and terms.
 
 ## Quick start
 

@@ -5,8 +5,9 @@
 用 ADB 无线调试把本地文件或文件夹推送到安卓设备，也支持反向拉取。
 纯 Python 标准库 + Tkinter 界面，不需要 `pip install`。
 
-**不用敲任何命令，不输 adb 命令也能用。** 解压后双击 `adb-push-gui.exe`（免安装包）或 `启动GUI.bat`（源码），
-打开图形界面，选好文件、点「开始」就行 —— 手机目录也是在界面上点着选。命令行参数只是给愿意用的人准备的。
+**不用敲任何命令，不输 adb 命令也能用。** 免安装包（**Python 和 ADB 都已内置**）解压后双击 `adb-push-gui.exe` 即可；
+源码方式则双击 `启动GUI.bat`。打开图形界面后选好文件、点「开始」就行 —— 手机目录也是在界面上点着选。
+命令行参数只是给愿意用的人准备的。
 
 > **个人使用完全免费，无需申请授权。**
 > 个人学习、研究、业余项目、非营利组织都可以自由使用和修改，不受任何限制。
@@ -16,10 +17,10 @@
 
 | 方式 | 适合 | 说明 |
 | --- | --- | --- |
-| **免安装包** `adb-push-v1.0.0-win64.zip` | 普通用户 | 内含打包好的 exe，**不需要安装 Python**，解压即用 |
-| **源码包** `adb-push-v1.0.0.zip` / 直接 clone | 想改代码 | 需要 Python 3.10+ |
+| **免安装包** `adb-push-v1.0.0-win64.zip` | 普通用户 | 已内置 exe **和 ADB**，不需要 Python、不需要单独装 adb，**解压即用** |
+| **源码包** `adb-push-v1.0.0.zip` / 直接 clone | 想改代码 | 需要 Python 3.10+ 和自备 ADB |
 
-都在 [Releases](https://github.com/0701QYhong/adb-push/releases/latest) 页面。两种方式**都需要 ADB**（见下）。
+都在 [Releases](https://github.com/0701QYhong/adb-push/releases/latest) 页面。
 
 ## 特性
 
@@ -36,12 +37,14 @@
 
 ## 依赖
 
-1. **ADB**：<https://developer.android.com/tools/releases/platform-tools>
-2. **Python 3.10+**（仅源码方式需要，免安装包可跳过），不需要装任何第三方包
+- **免安装包：什么都不用装。** ADB 已随包内置，解压到任意目录，双击 `adb-push-gui.exe` 即可。
+- **源码方式**：需要 **Python 3.10+**（不需要任何第三方包），以及自备 **ADB**：<https://developer.android.com/tools/releases/platform-tools>
 
-adb 按以下顺序自动查找：`--adb` 参数 → 环境变量 `ADB_PATH` → 系统 `PATH` → 程序所在目录及其上级目录下的 `platform-tools/`。
+源码方式下，adb 按以下顺序自动查找：`--adb` 参数 → 环境变量 `ADB_PATH` → 系统 `PATH` → 程序所在目录及其上级目录下的 `platform-tools/`。
 
 > 最省事的做法：把解压出来的 `platform-tools` 文件夹直接放到 exe 旁边，程序会自动找到它。
+>
+> 免安装包内的 `platform-tools` 为 Google 官方原样分发，版权与许可见包内 `platform-tools/NOTICE.txt`。
 
 ## 快速开始
 
