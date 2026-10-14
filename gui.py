@@ -23,12 +23,16 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog, ttk
 from typing import List, Optional, Tuple
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 打包成 exe 后，脚本目录会变成临时解包目录，配置文件需定位到 exe 所在目录
+_APP_DIR = (os.path.dirname(os.path.abspath(sys.executable))
+            if getattr(sys, "frozen", False)
+            else os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _APP_DIR)
 
 import adb_utils as U  # noqa: E402
 import transfer as T  # noqa: E402
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+CONFIG_PATH = os.path.join(_APP_DIR, "config.json")
 
 
 class DevicePathDialog(tk.Toplevel):
@@ -186,6 +190,16 @@ class AdbPushGUI:
         self.root.title("ADB 无线推送工具")
         self.root.geometry("980x680")
         self.root.minsize(900, 600)
+
+        # 窗口图标（打包后随 exe 一起分发；缺失不影响启动）
+        self._icon = None
+        try:
+            icon_file = U.resource_path("assets", "icon.png")
+            if os.path.exists(icon_file):
+                self._icon = tk.PhotoImage(file=icon_file)   # 必须留引用，否则被回收
+                self.root.iconphoto(True, self._icon)
+        except Exception:                                       # noqa: BLE001
+            self._icon = None
 
         self.events: "queue.Queue[tuple]" = queue.Queue()
         self.worker: Optional[threading.Thread] = None

@@ -5,6 +5,19 @@
 用 ADB 无线调试把本地文件或文件夹推送到安卓设备，也支持反向拉取。
 纯 Python 标准库 + Tkinter 界面，不需要 `pip install`。
 
+> **个人使用完全免费，无需申请授权。**
+> 个人学习、研究、业余项目、非营利组织都可以自由使用和修改，不受任何限制。
+> 只有**商业用途**（出售、付费服务、集成进商业产品等）需要先联系作者取得授权 —— 详见文末「许可证」。
+
+## 下载
+
+| 方式 | 适合 | 说明 |
+| --- | --- | --- |
+| **免安装包** `adb-push-v1.0.0-win64.zip` | 普通用户 | 内含打包好的 exe，**不需要安装 Python**，解压即用 |
+| **源码包** `adb-push-v1.0.0.zip` / 直接 clone | 想改代码 | 需要 Python 3.10+ |
+
+都在 [Releases](https://github.com/0701QYhong/adb-push/releases/latest) 页面。两种方式**都需要 ADB**（见下）。
+
 ## 特性
 
 - **断点续传**：push / pull 都支持，中断后从断点继续
@@ -20,14 +33,16 @@
 
 ## 依赖
 
-1. **Python 3.10+**（安装时勾选 *Add Python to PATH*），无需安装任何第三方包
-2. **ADB**：<https://developer.android.com/tools/releases/platform-tools>
+1. **ADB**：<https://developer.android.com/tools/releases/platform-tools>
+2. **Python 3.10+**（仅源码方式需要，免安装包可跳过），不需要装任何第三方包
 
-adb 按以下顺序自动查找：`--adb` 参数 → 环境变量 `ADB_PATH` → 系统 `PATH` → 本工具目录及其父目录下的 `platform-tools/`。
+adb 按以下顺序自动查找：`--adb` 参数 → 环境变量 `ADB_PATH` → 系统 `PATH` → 程序所在目录及其上级目录下的 `platform-tools/`。
+
+> 最省事的做法：把解压出来的 `platform-tools` 文件夹直接放到 exe 旁边，程序会自动找到它。
 
 ## 快速开始
 
-双击 `启动GUI.bat`，或直接用命令行：
+解压免安装包后双击 `adb-push-gui.exe`；源码方式则双击 `启动GUI.bat`。也可以直接用命令行：
 
 ```bash
 # 自动发现并连接设备（USB 或同 WiFi 的无线调试）
@@ -108,4 +123,9 @@ python adb_push.py --batch --config config.json
 
 ## 许可证
 
-[PolyForm Noncommercial License 1.0.0](LICENSE)：个人学习、研究、业余项目及非营利组织可免费使用与修改，**禁止任何商业用途**。商业授权请开 Issue 联系。
+[PolyForm Noncommercial License 1.0.0](LICENSE)
+
+- **免费、无需授权**：个人学习、研究、测试、业余项目、慈善/教育/公共研究/政府等非营利机构，都可以自由使用、修改和分发。
+- **需要授权**：任何商业用途，包括出售本工具或基于它的产品、作为付费服务的一部分、集成进商业软件等。
+
+要商业授权请开一个 [Issue](https://github.com/0701QYhong/adb-push/issues) 联系作者，一般不会为难。

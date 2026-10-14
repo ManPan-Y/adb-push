@@ -26,6 +26,7 @@ import queue
 import re
 import shutil
 import subprocess
+import sys
 import threading
 import time
 from dataclasses import dataclass, field
@@ -64,12 +65,35 @@ class AdbNotFoundError(AdbError):
 
 
 # --------------------------------------------------------------------------- #
+# 路径：区分「程序目录」与「随包只读资源」
+# --------------------------------------------------------------------------- #
+
+def app_dir() -> str:
+    """
+    程序所在目录。
+
+    打包成 exe 后 `__file__` 指向 PyInstaller 解包出的临时目录，用它去找
+    `platform-tools/`、`config.json` 会全部落空，因此这些「用户可见」的
+    路径必须统一走这里（打包后即 exe 所在目录）。
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def resource_path(*parts: str) -> str:
+    """随程序分发的只读资源（打包后位于 sys._MEIPASS，如 assets/icon.png）。"""
+    base = getattr(sys, "_MEIPASS", None) or os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base, *parts)
+
+
+# --------------------------------------------------------------------------- #
 # adb 可执行文件定位
 # --------------------------------------------------------------------------- #
 
 def _candidate_adb_paths(explicit: Optional[str] = None) -> List[str]:
     """返回所有可能的 adb 路径候选（按优先级排序）。"""
-    here = os.path.dirname(os.path.abspath(__file__))
+    here = app_dir()
     cands: List[str] = []
 
     if explicit:
@@ -95,8 +119,6 @@ def _candidate_adb_paths(explicit: Optional[str] = None) -> List[str]:
     for d in (r"C:\platform-tools",
               r"C:\adb",
               r"D:\platform-tools",
-              r"D:\GAME\platform-tools",
-              r"C:\Users\Admin\Desktop\YHGame\platform-tools",
               os.path.expanduser(r"~\platform-tools"),
               os.path.expanduser(r"~\AppData\Local\Android\Sdk\platform-tools")):
         for exe in ("adb.exe", "adb"):

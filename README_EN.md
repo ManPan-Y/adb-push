@@ -5,6 +5,20 @@
 Push local files or folders to an Android device over ADB wireless debugging, and pull them back.
 Pure Python standard library + a Tkinter GUI. No `pip install` required.
 
+> **Free for personal use — no permission needed.**
+> Personal study, research, hobby projects and non-profit organizations may use and modify it freely.
+> Only **commercial use** (reselling, paid services, integration into a commercial product, etc.)
+> requires asking the author for a license — see "License" at the end.
+
+## Download
+
+| Package | For | Notes |
+| --- | --- | --- |
+| **`adb-push-v1.0.0-win64.zip`** (portable) | Most users | Bundled `.exe`, **no Python needed**, just unzip and run |
+| **`adb-push-v1.0.0.zip`** / clone | Developers | Requires Python 3.10+ |
+
+Both are on the [Releases](https://github.com/0701QYhong/adb-push/releases/latest) page. Either way you still need **ADB** (below).
+
 ## Features
 
 - **Resumable transfer**: works for both push and pull; interrupted transfers continue from where they stopped
@@ -20,14 +34,16 @@ Pure Python standard library + a Tkinter GUI. No `pip install` required.
 
 ## Requirements
 
-1. **Python 3.10+** (check *Add Python to PATH* during installation). No third-party packages.
-2. **ADB**: <https://developer.android.com/tools/releases/platform-tools>
+1. **ADB**: <https://developer.android.com/tools/releases/platform-tools>
+2. **Python 3.10+** (source package only — skip this if you use the portable build). No third-party packages.
 
-`adb` is located automatically in this order: the `--adb` argument → the `ADB_PATH` environment variable → the system `PATH` → a `platform-tools/` folder next to this tool or in its parent directory.
+`adb` is located automatically in this order: the `--adb` argument → the `ADB_PATH` environment variable → the system `PATH` → a `platform-tools/` folder next to the program or in a parent directory.
+
+> Easiest setup: drop the extracted `platform-tools` folder right next to the `.exe` — it will be found automatically.
 
 ## Quick start
 
-Double-click `启动GUI.bat`, or use the command line:
+Unzip the portable build and double-click `adb-push-gui.exe`; from source, double-click `启动GUI.bat`. Or use the command line:
 
 ```bash
 # Discover and connect to a device (USB or wireless debugging on the same Wi-Fi)
@@ -108,4 +124,9 @@ See the comments inside `config.example.json` for the field descriptions.
 
 ## License
 
-[PolyForm Noncommercial License 1.0.0](LICENSE): free to use and modify for personal study, research, hobby projects and non-profit organizations. **Commercial use is prohibited.** For commercial licensing, please open an issue.
+[PolyForm Noncommercial License 1.0.0](LICENSE)
+
+- **Free, no permission needed**: personal study, research, testing, hobby projects, and charitable / educational / public-research / government organizations may use, modify and distribute it freely.
+- **License required**: any commercial use, including selling this tool or products based on it, using it as part of a paid service, or bundling it into commercial software.
+
+For commercial licensing, just open an [issue](https://github.com/0701QYhong/adb-push/issues) — the author is generally flexible.

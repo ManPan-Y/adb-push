@@ -41,13 +41,16 @@ import sys
 import threading
 from typing import List, Optional
 
-# 允许从任意目录运行本脚本
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 允许从任意目录运行本脚本；打包成 exe 后即 exe 所在目录
+_APP_DIR = (os.path.dirname(os.path.abspath(sys.executable))
+            if getattr(sys, "frozen", False)
+            else os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _APP_DIR)
 
 import adb_utils as U  # noqa: E402
 import transfer as T  # noqa: E402
 
-DEFAULT_CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+DEFAULT_CONFIG = os.path.join(_APP_DIR, "config.json")
 
 
 # --------------------------------------------------------------------------- #
