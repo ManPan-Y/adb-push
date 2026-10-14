@@ -113,6 +113,8 @@ See the comments inside `config.example.json` for the field descriptions.
 - **Concurrency bound**: `file_workers × chunk_workers ≤ jobs`, so the number of concurrent adb connections never exceeds `--jobs`.
 - **Symlinks**: remote enumeration always uses `find -H`; without it, files under `/sdcard` are invisible (it is itself a symlink).
 - **Staging directory**: `.adbp/` is cleaned up after a successful transfer. Changing `--chunk-size` makes that file restart from scratch (chunk offsets change — intentional).
+- **Runtime unpacking**: the single-file `.exe` unpacks itself into a temporary `_MEIxxxxxx` folder **next to the executable** and removes it on exit. So don't keep the program in a read-only folder, and don't delete that folder while it runs.
+- **Cleanup on exit**: closing the GUI terminates the adb process **it started itself**; if adb was already running (shared with Android Studio / scrcpy, for example) it is left alone.
 
 ## Troubleshooting
 

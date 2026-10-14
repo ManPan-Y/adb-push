@@ -515,6 +515,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
     reporter = ConsoleReporter(quiet=args.quiet)
 
+    # 先校验参数，再碰 adb。
+    # 任何一条 adb 命令都会隐式拉起 adb server，而「双击 exe」这种不带参数、
+    # 必然失败的情况不该留下一个常驻后台进程，所以校验必须前置。
+    one_shot = (args.devices, args.discover, args.auto, args.pair,
+                args.to_wireless, args.connect, args.save_config, args.batch)
+    if not any(one_shot):
+        if not args.source or not args.target:
+            print("[错误] 传输需要同时指定 --source 和 --target。")
+            build_parser().print_help()
+            print("\n提示：配置文件中保存了常用目标目录，可用 --config 复用。")
+            print("提示：只想连一下设备，可以用 --auto / --devices / --connect。")
+            return 2
+        if (args.direction == "push") and not args.pull and not os.path.exists(args.source):
+            print(f"[错误] 本地源路径不存在：{args.source}")
+            return 2
+
     # 定位 adb
     try:
         adb_path = U.resolve_adb(args.adb)
@@ -570,16 +586,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.batch:
         return run_batch(args, adb_path, reporter)
 
-    # 默认：传输（推送或拉取）
-    if not args.source or not args.target:
-        print("[错误] 传输需要同时指定 --source 和 --target。")
-        build_parser().print_help()
-        print("\n提示：配置文件中保存了常用目标目录，可用 --config 复用。")
-        return 2
-    if (args.direction == "push") and not args.pull and not os.path.exists(args.source):
-        print(f"[错误] 本地源路径不存在：{args.source}")
-        return 2
-
+    # 默认：传输（推送或拉取）。参数合法性已在开头校验过。
     return run_sync(args, adb_path, reporter)
 
 

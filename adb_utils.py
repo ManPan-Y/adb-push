@@ -25,6 +25,7 @@ import posixpath
 import queue
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -208,13 +209,29 @@ def run_adb(args: Sequence[object],
     return proc.returncode, out, err
 
 
+def server_is_running(timeout: float = 0.3) -> bool:
+    """
+    adb server 是否已经在监听。
+
+    任何一条 adb 命令都会**隐式**拉起 server，所以想区分「server 是本程序
+    拉起来的」还是「本来就在跑（可能被 Android Studio / scrcpy 等共享）」，
+    必须在发出第一条 adb 命令**之前**用这里探测一次。
+    """
+    port = int(os.environ.get("ANDROID_ADB_SERVER_PORT", 5037) or 5037)
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
 def start_server(adb_path: Optional[str] = None) -> None:
     """确保 adb server 已启动。"""
     run_adb(["start-server"], adb_path=adb_path, timeout=30)
 
 
 def kill_server(adb_path: Optional[str] = None) -> None:
-    """关闭 adb server（用于彻底重置连接状态）。"""
+    """关闭 adb server（用于彻底重置连接状态，或在退出时收拾自己拉起的进程）。"""
     run_adb(["kill-server"], adb_path=adb_path, timeout=30)
 
 

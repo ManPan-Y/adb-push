@@ -111,6 +111,8 @@ python adb_push.py --batch --config config.json
 - **并发上限**：`file_workers × chunk_workers ≤ jobs`，任意时刻并发 adb 连接数不超过 `--jobs`。
 - **符号链接**：远端枚举一律 `find -H`，否则看不到 `/sdcard` 里的文件（它本身是符号链接）。
 - **暂存目录**：`.adbp/` 传输完成后自动清理。改动 `--chunk-size` 会让该文件从头重传（分片偏移变了，刻意如此）。
+- **运行时的临时解包**：单文件 exe 会在**自身所在目录**临时解包出 `_MEIxxxxxx` 文件夹，退出时自动删除。因此别把程序放在只读目录，运行中也不用手动删那个文件夹。
+- **退出时收尾**：关闭界面会自动结束**本程序拉起的** adb 进程；如果 adb 本来就在运行（例如 Android Studio / scrcpy 也在用），则不会动它。
 
 ## 常见问题
 

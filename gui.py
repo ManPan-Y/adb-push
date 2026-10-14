@@ -191,6 +191,12 @@ class AdbPushGUI:
         self.root.geometry("980x680")
         self.root.minsize(900, 600)
 
+        # 必须在发出第一条 adb 命令之前探测：adb server 是不是本来就在跑。
+        # 每条 adb 命令都会隐式拉起 server，只有「由本程序拉起」的那个才在
+        # 退出时关掉，否则会误杀别的工具（Android Studio / scrcpy 等）共用的 server。
+        self._adb_server_preexisting = U.server_is_running()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+
         # 窗口图标（打包后随 exe 一起分发；缺失不影响启动）
         self._icon = None
         try:
@@ -479,6 +485,33 @@ class AdbPushGUI:
         self.busy = busy
         self.start_btn.configure(state="disabled" if busy else "normal")
         self.cancel_btn.configure(state="normal" if busy else "disabled")
+
+    # ------------------------------------------------------------- 退出 --
+    def _on_close(self) -> None:
+        """关闭窗口：先确认没有任务在跑，再收拾本程序拉起的 adb server。"""
+        if self.busy:
+            if not messagebox.askyesno(
+                    "确认退出",
+                    "正在传输，确定要退出吗？\n"
+                    "已传部分会保留，下次运行自动续传。"):
+                return
+            self.cancel_requested = True
+            # 给后台线程一点时间收尾，避免在传输中途把 adb 杀掉
+            worker = self.worker
+            if worker is not None and worker.is_alive():
+                worker.join(timeout=3.0)
+
+        self._cleanup_adb_server()
+        self.root.destroy()
+
+    def _cleanup_adb_server(self) -> None:
+        """关掉由本程序拉起的 adb server；本来就存在的则不动。"""
+        if self._adb_server_preexisting:
+            return
+        try:
+            U.kill_server(adb_path=self.adb_path)
+        except Exception:                                       # noqa: BLE001
+            pass                                                # 收尾失败不该影响退出
 
     # --------------------------------------------------------- 线程工具 --
     def run_bg(self, fn, *a, **kw) -> None:
