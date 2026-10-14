@@ -1,0 +1,24 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# ---- 本工具运行时产物 ----
+# 哈希清单缓存（每台机器/每个设备都不同，不要提交）
+.adbp_cache/
+
+# ---- 本地个人配置（可能含设备 IP / 本机路径） ----
+config.json
+
+# ---- Android Platform Tools（几十 MB，属于外部依赖，请从官网下载） ----
+platform-tools/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
