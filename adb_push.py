@@ -39,6 +39,7 @@ import json
 import os
 import sys
 import threading
+import time
 from typing import List, Optional
 
 # 允许从任意目录运行本脚本；打包成 exe 后即 exe 所在目录
@@ -48,6 +49,7 @@ _APP_DIR = (os.path.dirname(os.path.abspath(sys.executable))
 sys.path.insert(0, _APP_DIR)
 
 import adb_utils as U  # noqa: E402
+import lan as L  # noqa: E402
 import transfer as T  # noqa: E402
 
 DEFAULT_CONFIG = os.path.join(_APP_DIR, "config.json")
@@ -357,6 +359,105 @@ def run_sync(args, adb_path: Optional[str], reporter: ConsoleReporter) -> int:
     return 0
 
 
+def _lan_defaults(args) -> None:
+    """把配置文件里的 lan 段补进缺省参数。"""
+    cfg = load_config(getattr(args, "config", "") or DEFAULT_CONFIG).get("lan") or {}
+    if not getattr(args, "lan_port", None):
+        args.lan_port = int(cfg.get("port") or L.DEFAULT_PORT)
+    if not getattr(args, "lan_token", None):
+        args.lan_token = cfg.get("token") or ""
+    if not getattr(args, "lan_root", None):
+        root = cfg.get("share_dir") or ""
+        args.lan_root = (root if os.path.isabs(root)
+                         else os.path.join(_APP_DIR, root or L.SHARE_DIRNAME))
+
+
+def do_lan_discover(args) -> int:
+    """UDP 广播发现局域网内开启了共享的对端。"""
+    _lan_defaults(args)
+    print("正在搜索局域网内的共享对端…")
+    peers = L.discover(timeout=2.0, extra_hosts=[args.lan_host] if args.lan_host else None)
+    if not peers:
+        print("未发现对端。请确认：对端已开启共享、双方在同一网段、防火墙放行 UDP 47821。")
+        print("仍可直连：--lan-host <IP> --lan-port <端口>")
+        return 1
+    for p in peers:
+        print("  {}".format(p))
+    print("\n提示：用 --lan --lan-host <IP> 走网卡传输。")
+    return 0
+
+
+def do_lan_serve(args) -> int:
+    """在本机开启网卡共享（阻塞运行）。"""
+    _lan_defaults(args)
+    srv = L.LanServer(args.lan_root, port=args.lan_port, token=args.lan_token,
+                      on_log=lambda m: print("  " + m))
+    try:
+        srv.start()
+    except OSError as exc:
+        print("[错误] 无法开启共享：{}".format(exc))
+        return 2
+    print("共享目录：{}".format(args.lan_root))
+    print("安卓版 / 另一台电脑填这个地址：{}".format(srv.address))
+    print("按 Ctrl+C 停止。")
+    try:
+        while True:
+            time.sleep(1.0)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        srv.stop()
+    return 0
+
+
+def run_lan_sync(args, reporter: ConsoleReporter) -> int:
+    """通过网卡同步（语义与 ADB 通道一致）。"""
+    _lan_defaults(args)
+    host = args.lan_host
+    if not host:
+        print("未指定 --lan-host，先广播发现…")
+        peers = L.discover(timeout=2.0)
+        if not peers:
+            print("[错误] 未发现对端，请用 --lan-host 指定 IP。")
+            return 2
+        host = peers[0].host
+        print("使用对端：{}".format(peers[0]))
+        if not args.lan_port:
+            args.lan_port = peers[0].port
+
+    direction = "pull" if args.pull else (args.direction or "push")
+    mode = "newer" if getattr(args, "newer_only", False) else args.mode
+    try:
+        stats = L.sync_lan(
+            host, args.source, args.target,
+            port=args.lan_port, token=args.lan_token,
+            direction=direction, mode=mode, verify=args.verify,
+            hash_algo=args.hash_algo or "md5",
+            resume=not args.no_resume,
+            chunk_size=int(args.chunk_size or 8) * 1024 * 1024,
+            jobs=int(args.jobs or 1),
+            dry_run=args.dry_run,
+            on_log=reporter.log,
+            on_progress=reporter.on_progress,
+        )
+    except (L.LanError, OSError, ValueError) as exc:
+        reporter.finish_line()
+        print("[错误] {}".format(exc))
+        return 2
+    finally:
+        reporter.finish_line()
+
+    if stats.failed:
+        print("\n以下 {} 个文件传输失败：".format(stats.failed))
+        for dest, reason in stats.failed_files[:20]:
+            print("  - {}：{}".format(dest, reason))
+        return 1
+    if stats.verify_failed:
+        print("\n[警告] {} 个文件校验未通过。".format(stats.verify_failed))
+        return 1
+    return 0
+
+
 def run_batch(args, adb_path: Optional[str], reporter: ConsoleReporter) -> int:
     """按配置文件中的 jobs 依次批量推送。"""
     cfg = load_config(args.config)
@@ -501,6 +602,17 @@ def build_parser() -> argparse.ArgumentParser:
     g_act.add_argument("--to-wireless", action="store_true",
                        help="由 USB 切换为无线调试（adb tcpip + adb connect）")
 
+    g_lan = p.add_argument_group("网卡直连（不需要 adb）")
+    g_lan.add_argument("--lan", action="store_true",
+                       help="改用网卡通道传输（配合 --lan-host；安卓版 App 或另一台电脑）")
+    g_lan.add_argument("--lan-host", help="对端 IP（不填则先广播发现）")
+    g_lan.add_argument("--lan-port", type=int, help="对端端口，默认 {}".format(L.DEFAULT_PORT))
+    g_lan.add_argument("--lan-token", help="对端若设置了访问令牌，填这里")
+    g_lan.add_argument("--lan-discover", action="store_true", help="发现局域网内开启了共享的对端")
+    g_lan.add_argument("--lan-serve", action="store_true",
+                       help="在本机开启共享（供安卓版/另一台电脑读写），Ctrl+C 停止")
+    g_lan.add_argument("--lan-root", help="本机共享目录，默认程序目录下 shared/")
+
     g_cfg = p.add_argument_group("配置与批量")
     g_cfg.add_argument("--config", default=DEFAULT_CONFIG, help="配置文件路径，默认同目录 config.json")
     g_cfg.add_argument("--batch", action="store_true", help="按配置文件的任务列表批量传输")
@@ -514,6 +626,20 @@ def main(argv: Optional[List[str]] = None) -> int:
     """程序入口。"""
     args = build_parser().parse_args(argv)
     reporter = ConsoleReporter(quiet=args.quiet)
+
+    # 网卡通道完全不碰 adb，先分流，避免「没装 adb 就用不了」。
+    if args.lan_discover or args.lan_serve:
+        return do_lan_discover(args) if args.lan_discover else do_lan_serve(args)
+    if args.lan:
+        if not args.source or not args.target:
+            print("[错误] 网卡传输需要同时指定 --source 和 --target。")
+            print("  推送：--lan --lan-host 192.168.1.8 --source \"D:\\A\" --target Download")
+            print("  拉取：--lan --lan-host 192.168.1.8 --pull --source Download --target \"D:\\备份\"")
+            return 2
+        if not args.pull and args.direction == "push" and not os.path.exists(args.source):
+            print("[错误] 本地源路径不存在：{}".format(args.source))
+            return 2
+        return run_lan_sync(args, reporter)
 
     # 先校验参数，再碰 adb。
     # 任何一条 adb 命令都会隐式拉起 adb server，而「双击 exe」这种不带参数、
