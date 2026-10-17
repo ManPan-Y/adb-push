@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="YHGamePush.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="YHGame 推送">
+
+    <Grid Padding="14" RowSpacing="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="170" />
+        </Grid.RowDefinitions>
+
+        <!-- 顶栏 -->
+        <Grid Grid.Row="0" ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="YHGame 推送" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                <TextBlock x:Name="ChannelText" Text="通道：ADB 无线调试" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
+                <TextBlock x:Name="StatusText" Text="就绪" Foreground="Gray" />
+            </StackPanel>
+            <Button Grid.Column="2" Content="清空日志" Click="OnClearLog" />
+        </Grid>
+
+        <!-- 主体 -->
+        <Grid Grid.Row="1" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="430" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" BorderThickness="1" CornerRadius="6"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <TabView x:Name="ConnTabs" IsAddTabButtonVisible="False"
+                         SelectionChanged="OnChannelChanged" Margin="4">
+                    <TabViewItem Header="ADB 无线调试" IsClosable="False">
+                        <Grid Padding="8" RowSpacing="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <Grid Grid.Row="0" ColumnSpacing="6" RowSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Button Grid.Row="0" Grid.Column="0" Content="自动连接" HorizontalAlignment="Stretch" Click="OnAutoConnect" />
+                                <Button Grid.Row="0" Grid.Column="1" Content="刷新设备" HorizontalAlignment="Stretch" Click="OnRefreshDevices" />
+                                <Button Grid.Row="0" Grid.Column="2" Content="无线配对" HorizontalAlignment="Stretch" Click="OnPair" />
+                                <Button Grid.Row="1" Grid.Column="0" Content="USB 转无线" HorizontalAlignment="Stretch" Click="OnToWireless" />
+                                <Button Grid.Row="1" Grid.Column="1" Content="断开" HorizontalAlignment="Stretch" Click="OnDisconnect" />
+                                <Button Grid.Row="1" Grid.Column="2" Content="获取 IP" HorizontalAlignment="Stretch" Click="OnGetIp" />
+                                <Button Grid.Row="2" Grid.Column="0" Content="连接地址" HorizontalAlignment="Stretch" Click="OnConnect" />
+                            </Grid>
+
+                            <ListView x:Name="DeviceList" Grid.Row="1" SelectionChanged="OnDeviceSelected" />
+
+                            <StackPanel Grid.Row="2" Spacing="6">
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="设备序列号" VerticalAlignment="Center" />
+                                    <TextBox x:Name="AdbSerialBox" Grid.Column="1" PlaceholderText="选中设备后自动填入" />
+                                </Grid>
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="60" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="设备 IP" VerticalAlignment="Center" />
+                                    <TextBox x:Name="AdbIpBox" Grid.Column="1" PlaceholderText="192.168.1.8" />
+                                    <TextBox x:Name="AdbPortBox" Grid.Column="2" Text="5555" />
+                                </Grid>
+                            </StackPanel>
+                        </Grid>
+                    </TabViewItem>
+
+                    <TabViewItem Header="网卡直连" IsClosable="False">
+                        <Grid Padding="8" RowSpacing="8">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Spacing="6">
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="共享目录" VerticalAlignment="Center" />
+                                    <TextBox x:Name="LanShareBox" Grid.Column="1" />
+                                    <Button Grid.Column="2" Content="浏览" Click="OnPickShareDir" />
+                                    <Button Grid.Column="3" Content="打开" Click="OnOpenShareDir" />
+                                </Grid>
+                                <Grid ColumnSpacing="6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="共享端口" VerticalAlignment="Center" />
+                                    <TextBox x:Name="LanPortBox" Grid.Column="1" Text="47820" />
+                                    <ToggleButton x:Name="LanToggleBtn" Grid.Column="2"
+                                                  Content="开启本机共享" HorizontalAlignment="Stretch"
+                                                  Click="OnToggleShare" />
+                                </Grid>
+                                <TextBlock x:Name="LanStatusText" Text="共享未开启" Foreground="Gray"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+
+                            <Grid Grid.Row="1" ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="70" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="对端地址" VerticalAlignment="Center" />
+                                <TextBox x:Name="LanHostBox" Grid.Column="1" PlaceholderText="192.168.1.9" />
+                                <TextBox x:Name="LanPeerPortBox" Grid.Column="2" Text="47820" />
+                            </Grid>
+
+                            <Grid Grid.Row="2" ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Content="搜索对端" Click="OnDiscoverPeers" />
+                                <Button Grid.Column="1" Content="连接测试" Click="OnProbePeer" />
+                                <TextBlock Grid.Column="2" Text="令牌" VerticalAlignment="Center" Foreground="Gray" />
+                                <TextBox x:Name="LanTokenBox" Grid.Column="3" PlaceholderText="可留空" />
+                            </Grid>
+
+                            <ListView x:Name="PeerList" Grid.Row="3" SelectionChanged="OnPeerSelected" />
+                        </Grid>
+                    </TabViewItem>
+                </TabView>
+            </Border>
+
+            <!-- 传输配置 -->
+            <ScrollViewer Grid.Column="1">
+                <StackPanel Spacing="10">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="方向" VerticalAlignment="Center" />
+                        <ComboBox x:Name="DirCombo" Grid.Column="1" SelectedIndex="0"
+                                  SelectionChanged="OnDirectionChanged" HorizontalAlignment="Stretch">
+                            <ComboBoxItem Content="推送  本地 → 设备/对端" />
+                            <ComboBoxItem Content="拉取  设备/对端 → 本地" />
+                        </ComboBox>
+                    </Grid>
+
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="源路径" VerticalAlignment="Center" />
+                        <TextBox x:Name="SrcBox" Grid.Column="1" PlaceholderText="D:\我的文件" />
+                        <Button x:Name="SrcBrowseBtn" Grid.Column="2" Content="浏览" Click="OnPickSrc" />
+                    </Grid>
+
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="目标路径" VerticalAlignment="Center" />
+                        <TextBox x:Name="DstBox" Grid.Column="1" Text="/sdcard/Download/" />
+                        <Button x:Name="DstBrowseBtn" Grid.Column="2" Content="浏览" Click="OnPickDst" />
+                    </Grid>
+
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="70" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="70" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="已存在" VerticalAlignment="Center" />
+                        <ComboBox x:Name="ModeCombo" Grid.Column="1" SelectedIndex="0" HorizontalAlignment="Stretch">
+                            <ComboBoxItem Content="差异同步（推荐）" Tag="diff" />
+                            <ComboBoxItem Content="覆盖" Tag="overwrite" />
+                            <ComboBoxItem Content="跳过" Tag="skip-existing" />
+                            <ComboBoxItem Content="仅较新" Tag="newer" />
+                        </ComboBox>
+                        <TextBlock Grid.Column="2" Text="校验" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,8,0" />
+                        <ComboBox x:Name="VerifyCombo" Grid.Column="3" SelectedIndex="0" HorizontalAlignment="Stretch">
+                            <ComboBoxItem Content="大小 + 哈希" Tag="hash" />
+                            <ComboBoxItem Content="仅大小" Tag="size" />
+                            <ComboBoxItem Content="不校验" Tag="none" />
+                        </ComboBox>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                        <CheckBox x:Name="ResumeCheck" Content="断点续传" IsChecked="True" />
+                        <TextBlock Text="并发数" VerticalAlignment="Center" />
+                        <NumberBox x:Name="JobsBox" Value="4" Minimum="1" Maximum="16"
+                                   SpinButtonPlacementMode="Compact" Width="90" />
+                    </StackPanel>
+
+                    <ProgressBar x:Name="Bar" Minimum="0" Maximum="100" Value="0" Height="8" />
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="ProgressText" Text="—" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="SpeedText" Grid.Column="1" Text="—" Foreground="Gray" />
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button x:Name="StartBtn" Content="开始" Style="{StaticResource AccentButtonStyle}" Click="OnStart" />
+                        <Button x:Name="CancelBtn" Content="取消" IsEnabled="False" Click="OnCancel" />
+                        <TextBlock x:Name="HintText" Text="差异同步 + 双校验 + 断点续传默认开启"
+                                   Foreground="Gray" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- 日志 -->
+        <Border Grid.Row="2" BorderThickness="1" CornerRadius="6"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="6">
+            <ScrollViewer x:Name="LogScroll" VerticalScrollBarVisibility="Auto">
+                <TextBlock x:Name="LogText" FontFamily="Consolas" FontSize="12"
+                           TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Window>
