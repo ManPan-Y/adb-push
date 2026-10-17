@@ -8,7 +8,7 @@ gui.py
     * 左侧：设备列表、无线连接工具按钮、adb 路径
     * 右侧：推送配置与实时进度、彩色日志
 
-运行：python gui.py    （或双击 启动GUI.bat）
+运行：python gui.py    （或双击 启动.bat）
 """
 
 from __future__ import annotations
@@ -30,9 +30,21 @@ _APP_DIR = (os.path.dirname(os.path.abspath(sys.executable))
 sys.path.insert(0, _APP_DIR)
 
 import adb_utils as U  # noqa: E402
+import lan as L  # noqa: E402
 import transfer as T  # noqa: E402
 
 CONFIG_PATH = os.path.join(_APP_DIR, "config.json")
+
+
+def load_config_file() -> dict:
+    """读取 config.json（容错：不存在 / 损坏都返回空配置）。"""
+    import json
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8-sig") as fp:
+            data = json.load(fp)
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
 
 
 class DevicePathDialog(tk.Toplevel):
@@ -216,6 +228,17 @@ class AdbPushGUI:
         self.serial_live: str = ""
         self.adb_path: Optional[str] = None
 
+        # ---- 网卡直连 ----
+        cfg = load_config_file()
+        lan_cfg = cfg.get("lan") or {}
+        share = str(lan_cfg.get("share_dir") or L.SHARE_DIRNAME)
+        self.share_dir_default = (share if os.path.isabs(share)
+                                  else os.path.join(_APP_DIR, share))
+        self.lan_port_default = str(lan_cfg.get("port") or L.DEFAULT_PORT)
+        self.lan_token_default = str(lan_cfg.get("token") or "")
+        self.lan_server: Optional[L.LanServer] = None
+        self.lan_peers: List[L.LanPeer] = []
+
         self._build_ui()
         self._poll_events()
         self.log("欢迎使用 ADB 无线推送工具。")
@@ -249,7 +272,18 @@ class AdbPushGUI:
         left = ttk.LabelFrame(mid, text="2. 设备连接", padding=8)
         left.pack(side="left", fill="both", expand=False)
 
-        self.device_box = tk.Listbox(left, height=8, width=46, exportselection=False)
+        # 两条通道：ADB 无线调试（需要 adb 与手机端调试授权）
+        #            网卡直连（只需要同一局域网，用安卓版 App 或另一台电脑做对端）
+        self.conn_nb = ttk.Notebook(left)
+        self.conn_nb.pack(fill="both", expand=True)
+        adb_tab = ttk.Frame(self.conn_nb, padding=6)
+        lan_tab = ttk.Frame(self.conn_nb, padding=6)
+        self.conn_nb.add(adb_tab, text="ADB 无线调试")
+        self.conn_nb.add(lan_tab, text="网卡直连")
+        self.conn_nb.bind("<<NotebookTabChanged>>", self._on_channel_change)
+        self.channel_var = tk.StringVar(value="adb")
+
+        self.device_box = tk.Listbox(adb_tab, height=8, width=40, exportselection=False)
         self.device_box.grid(row=0, column=0, columnspan=3, sticky="nsew")
         self.device_box.bind("<<ListboxSelect>>", self.on_device_select)
 
@@ -261,27 +295,79 @@ class AdbPushGUI:
             ("连接地址", self.do_connect),
             ("mDNS 发现", self.do_discover),
             ("断开", self.do_disconnect),
+            ("设备 IP", self.do_get_ip),
         ]
         for i, (text, cmd) in enumerate(btns):
-            ttk.Button(left, text=text, command=cmd, width=14).grid(
+            ttk.Button(adb_tab, text=text, command=cmd, width=14).grid(
                 row=1 + i // 3, column=i % 3, padx=3, pady=3, sticky="ew")
 
-        ttk.Label(left, text="选中设备：").grid(row=4, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(adb_tab, text="选中设备：").grid(row=4, column=0, sticky="w", pady=(6, 0))
         self.serial_var = tk.StringVar()
-        ttk.Entry(left, textvariable=self.serial_var).grid(
+        ttk.Entry(adb_tab, textvariable=self.serial_var).grid(
             row=4, column=1, columnspan=2, sticky="ew", padx=4, pady=(6, 0))
 
-        ttk.Label(left, text="设备 IP：").grid(row=5, column=0, sticky="w", pady=(4, 0))
+        ttk.Label(adb_tab, text="设备 IP：").grid(row=5, column=0, sticky="w", pady=(4, 0))
         self.ip_var = tk.StringVar()
-        ttk.Entry(left, textvariable=self.ip_var).grid(
+        ttk.Entry(adb_tab, textvariable=self.ip_var).grid(
             row=5, column=1, sticky="ew", padx=4, pady=(4, 0))
-        ttk.Button(left, text="自动获取", command=self.do_get_ip, width=8).grid(
+        ttk.Button(adb_tab, text="自动获取", command=self.do_get_ip, width=8).grid(
             row=5, column=2, sticky="ew", pady=(4, 0))
 
-        ttk.Label(left, text="端口：").grid(row=6, column=0, sticky="w", pady=(4, 0))
+        ttk.Label(adb_tab, text="端口：").grid(row=6, column=0, sticky="w", pady=(4, 0))
         self.port_var = tk.StringVar(value="5555")
-        ttk.Entry(left, textvariable=self.port_var, width=8).grid(
+        ttk.Entry(adb_tab, textvariable=self.port_var, width=8).grid(
             row=6, column=1, sticky="w", padx=4, pady=(4, 0))
+
+        # ---------------- 网卡直连 ----------------
+        lan_tab.columnconfigure(1, weight=1)
+        ttk.Label(lan_tab, text="本机共享目录：").grid(row=0, column=0, sticky="w")
+        self.share_var = tk.StringVar(value=self.share_dir_default)
+        ttk.Entry(lan_tab, textvariable=self.share_var, width=26).grid(
+            row=0, column=1, sticky="ew", padx=4)
+        ttk.Button(lan_tab, text="…", width=3, command=self.pick_share_dir).grid(
+            row=0, column=2)
+        ttk.Button(lan_tab, text="打开", width=5, command=self.open_share_dir).grid(
+            row=0, column=3, padx=(4, 0))
+
+        ttk.Label(lan_tab, text="共享端口：").grid(row=1, column=0, sticky="w", pady=(4, 0))
+        self.lan_port_var = tk.StringVar(value=self.lan_port_default)
+        ttk.Entry(lan_tab, textvariable=self.lan_port_var, width=8).grid(
+            row=1, column=1, sticky="w", padx=4, pady=(4, 0))
+        self.lan_btn = ttk.Button(lan_tab, text="开启共享", width=10,
+                                  command=self.toggle_lan_server)
+        self.lan_btn.grid(row=1, column=2, columnspan=2, sticky="e", pady=(4, 0))
+
+        self.lan_state_var = tk.StringVar(value="共享未开启")
+        ttk.Label(lan_tab, textvariable=self.lan_state_var, foreground="#0b6623",
+                  wraplength=300).grid(row=2, column=0, columnspan=4, sticky="w", pady=(4, 0))
+
+        ttk.Separator(lan_tab, orient="horizontal").grid(
+            row=3, column=0, columnspan=4, sticky="ew", pady=8)
+
+        ttk.Label(lan_tab, text="对端地址：").grid(row=4, column=0, sticky="w")
+        self.lan_host_var = tk.StringVar()
+        ttk.Entry(lan_tab, textvariable=self.lan_host_var).grid(
+            row=4, column=1, sticky="ew", padx=4)
+        self.lan_peer_port_var = tk.StringVar(value=self.lan_port_default)
+        ttk.Entry(lan_tab, textvariable=self.lan_peer_port_var, width=7).grid(
+            row=4, column=2, sticky="w")
+
+        bar = ttk.Frame(lan_tab)
+        bar.grid(row=5, column=0, columnspan=4, sticky="ew", pady=(6, 0))
+        ttk.Button(bar, text="搜索对端", width=10, command=self.do_lan_discover).pack(side="left")
+        ttk.Button(bar, text="直连测试", width=10, command=self.do_lan_probe).pack(side="left", padx=6)
+        ttk.Label(bar, text="令牌：", foreground="#666").pack(side="left")
+        self.lan_token_var = tk.StringVar(value=self.lan_token_default)
+        ttk.Entry(bar, textvariable=self.lan_token_var, width=10).pack(side="left")
+
+        self.peer_box = tk.Listbox(lan_tab, height=5, width=40, exportselection=False)
+        self.peer_box.grid(row=6, column=0, columnspan=4, sticky="nsew", pady=(6, 0))
+        self.peer_box.bind("<<ListboxSelect>>", self.on_peer_select)
+        lan_tab.rowconfigure(6, weight=1)
+
+        ttk.Label(lan_tab, text="安卓版 App 或另一台电脑开共享后即可互传，不需要 adb。",
+                  foreground="#666", wraplength=300).grid(
+            row=7, column=0, columnspan=4, sticky="w", pady=(6, 0))
 
         # ---------- 中部右：传输配置 ----------
         right = ttk.LabelFrame(mid, text="3. 传输配置", padding=8)
@@ -295,6 +381,8 @@ class AdbPushGUI:
                         value="push", command=self._on_direction).pack(side="left", padx=4)
         ttk.Radiobutton(drow, text="拉取 设备→本地", variable=self.dir_var,
                         value="pull", command=self._on_direction).pack(side="left", padx=4)
+        self.channel_label = ttk.Label(drow, text="通道：ADB", foreground="#1f4e79")
+        self.channel_label.pack(side="right", padx=4)
 
         ttk.Label(right, text="源路径：").grid(row=1, column=0, sticky="w", pady=(6, 0))
         self.src_var = tk.StringVar()
@@ -456,6 +544,11 @@ class AdbPushGUI:
             self._write_log(ev[1], ev[2] if len(ev) > 2 else "")
         elif kind == "devices":
             self._render_devices(ev[1])
+        elif kind == "peers":
+            self._render_peers(ev[1])
+        elif kind == "lan_peer_info":
+            self.lan_state_var.set("对端在线：{}｜{}".format(
+                ev[1].get("name") or "", ev[1].get("root") or ""))
         elif kind == "progress":
             _, pct, prog_text, speed_text = ev
             self.pb_var.set(max(0, min(100, pct)))
@@ -501,6 +594,9 @@ class AdbPushGUI:
             if worker is not None and worker.is_alive():
                 worker.join(timeout=3.0)
 
+        if self.lan_server:
+            self.lan_server.stop()
+            self.lan_server = None
         self._cleanup_adb_server()
         self.root.destroy()
 
@@ -555,6 +651,10 @@ class AdbPushGUI:
             "resume": self.resume_var.get(),
             "jobs": self.jobs_var.get(),
             "dry_run": self.dry_var.get(),
+            "channel": self.channel_var.get(),
+            "lan_host": self.lan_host_var.get().strip(),
+            "lan_port": self.lan_peer_port_var.get().strip(),
+            "lan_token": self.lan_token_var.get().strip(),
         }
 
     def _ask_main(self, fn, *args, **kwargs):
@@ -784,6 +884,132 @@ class AdbPushGUI:
         else:
             self.log("无法自动获取 IP，请手动填写。", "warn")
 
+    # ---------------------------------------------------------- 网卡直连 --
+    def _on_channel_change(self, _event=None) -> None:
+        """切换 ADB / 网卡标签页时同步通道与默认目标路径。"""
+        try:
+            lan = self.conn_nb.index(self.conn_nb.select()) == 1
+        except tk.TclError:
+            lan = False
+        self.channel_var.set("lan" if lan else "adb")
+        self.channel_label.configure(text="通道：网卡直连" if lan
+                                     else "通道：ADB 无线调试")
+        dst = self.dst_var.get().strip()
+        if lan:
+            # 网卡通道的目标是对端共享目录下的相对路径
+            if not dst or dst.startswith("/"):
+                self.dst_var.set("Download")
+        else:
+            if not dst or not dst.startswith("/"):
+                self.dst_var.set("/sdcard/Download/")
+
+    def pick_share_dir(self) -> None:
+        path = filedialog.askdirectory(title="选择本机共享目录",
+                                       initialdir=self.share_var.get() or _APP_DIR)
+        if path:
+            self.share_var.set(path)
+
+    def open_share_dir(self) -> None:
+        path = self.share_var.get().strip() or self.share_dir_default
+        try:
+            os.makedirs(path, exist_ok=True)
+            os.startfile(path)                                  # noqa: S606
+        except OSError as exc:
+            messagebox.showerror("无法打开", str(exc))
+
+    def toggle_lan_server(self) -> None:
+        if self.lan_server and self.lan_server.running:
+            self._stop_lan_server()
+        else:
+            self._start_lan_server()
+
+    def _start_lan_server(self) -> None:
+        root = self.share_var.get().strip() or self.share_dir_default
+        try:
+            port = int(self.lan_port_var.get().strip() or L.DEFAULT_PORT)
+        except ValueError:
+            port = L.DEFAULT_PORT
+        try:
+            os.makedirs(root, exist_ok=True)
+        except OSError as exc:
+            messagebox.showerror("无法创建共享目录", str(exc))
+            return
+        server = L.LanServer(root, port=port, token=self.lan_token_var.get().strip(),
+                             on_log=lambda m: self.log(m, "info"))
+        try:
+            server.start()
+        except OSError as exc:
+            messagebox.showerror("共享端口被占用",
+                                 "无法监听端口 {}：{}\n换个端口再试。".format(port, exc))
+            return
+        self.lan_server = server
+        self.share_var.set(root)
+        self.lan_btn.configure(text="停止共享")
+        self.lan_state_var.set("共享已开启：{}\n其他设备填这个地址".format(server.address))
+        self.log("网卡共享已开启：{}｜目录 {}".format(server.address, root), "ok")
+
+    def _stop_lan_server(self) -> None:
+        if self.lan_server:
+            self.lan_server.stop()
+            self.lan_server = None
+        self.lan_btn.configure(text="开启共享")
+        self.lan_state_var.set("共享未开启")
+        self.log("网卡共享已停止。", "info")
+
+    def do_lan_discover(self) -> None:
+        self.run_bg(self._lan_discover_job)
+
+    def _lan_discover_job(self) -> None:
+        self.log("正在搜索局域网内的共享对端…")
+        peers = L.discover(timeout=2.0)
+        self.events.put(("peers", peers))
+        if peers:
+            self.log("发现 {} 个对端。点选即可填入地址。".format(len(peers)), "ok")
+        else:
+            self.log("未发现对端：确认对端已开启共享、双方同一网段、防火墙放行 UDP 47821。",
+                     "warn")
+
+    def on_peer_select(self, _event=None) -> None:
+        sel = self.peer_box.curselection()
+        if not sel or sel[0] >= len(self.lan_peers):
+            return
+        peer = self.lan_peers[sel[0]]
+        self.lan_host_var.set(peer.host)
+        self.lan_peer_port_var.set(str(peer.port))
+        self.log("已选择对端：{}｜共享目录 {}".format(
+            peer.name, peer.info.get("root") or "-"), "info")
+
+    def do_lan_probe(self) -> None:
+        self.run_bg(self._lan_probe_job, self.lan_host_var.get().strip(),
+                    self.lan_peer_port_var.get().strip(), self.lan_token_var.get().strip())
+
+    def _lan_probe_job(self, host: str, port_text: str, token: str) -> None:
+        if not host:
+            self.log("请先填写对端地址（或用「搜索对端」）。", "warn")
+            return
+        try:
+            port = int(port_text or L.DEFAULT_PORT)
+        except ValueError:
+            port = L.DEFAULT_PORT
+        try:
+            info = L.LanClient(host, port, token, timeout=8).info()
+        except L.LanError as exc:
+            self.log("连接失败：{}".format(exc), "err")
+            return
+        self.log("连接成功：{}｜{}｜共享目录 {}".format(
+            info.get("name") or host, info.get("platform"), info.get("root")), "ok")
+        self.events.put(("lan_peer_info", info))
+
+    def _render_peers(self, peers) -> None:
+        self.lan_peers = list(peers)
+        self.peer_box.delete(0, "end")
+        for p in peers:
+            self.peer_box.insert("end", str(p))
+        if peers:
+            self.peer_box.selection_clear(0, "end")
+            self.peer_box.selection_set(0)
+            self.on_peer_select()
+
     # ----------------------------------------------------------- 选择路径 --
     def ask_device_path(self, title: str, initial: str = "/sdcard",
                         want_files: bool = True) -> Optional[str]:
@@ -800,9 +1026,24 @@ class AdbPushGUI:
         self.root.wait_window(dlg)
         return dlg.result
 
+    def _ask_rel_path(self, title: str, initial: str = "") -> Optional[str]:
+        """网卡通道下让用户输入对端共享目录内的相对路径。"""
+        from tkinter import simpledialog as _sd
+        text = _sd.askstring(
+            title,
+            "输入对端共享目录内的相对路径（留空表示根目录）：\n"
+            "例如 Download  或  Download\\a.zip",
+            initialvalue=initial.strip("/\\") or "Download")
+        return text.strip() if text is not None else None
+
     def pick_src_file(self) -> None:
-        """源路径：push 选本地文件，pull 选设备上的文件。"""
-        if self.dir_var.get() == "pull":
+        """源路径：push 选本地文件，pull 选设备/对端文件。"""
+        if self.channel_var.get() == "lan":
+            if self.dir_var.get() == "pull":
+                path = self._ask_rel_path("选择对端文件", self.src_var.get())
+            else:
+                path = filedialog.askopenfilename(title="选择要推送的文件")
+        elif self.dir_var.get() == "pull":
             path = self.ask_device_path("选择设备上的文件",
                                         initial=self.src_var.get().strip() or "/sdcard",
                                         want_files=True)
@@ -812,8 +1053,13 @@ class AdbPushGUI:
             self.src_var.set(path)
 
     def pick_src_dir(self) -> None:
-        """源路径：push 选本地文件夹，pull 选设备上的文件夹。"""
-        if self.dir_var.get() == "pull":
+        """源路径：push 选本地文件夹，pull 选设备/对端文件夹。"""
+        if self.channel_var.get() == "lan":
+            if self.dir_var.get() == "pull":
+                path = self._ask_rel_path("选择对端文件夹", self.src_var.get())
+            else:
+                path = filedialog.askdirectory(title="选择要推送的文件夹")
+        elif self.dir_var.get() == "pull":
             path = self.ask_device_path("选择设备上的文件夹",
                                         initial=self.src_var.get().strip() or "/sdcard",
                                         want_files=False)
@@ -823,8 +1069,12 @@ class AdbPushGUI:
             self.src_var.set(path)
 
     def pick_dst(self) -> None:
-        """目标路径：push 选设备目录，pull 选本地目录。"""
-        if self.dir_var.get() == "pull":
+        """目标路径：push 选远端目录，pull 选本地目录。"""
+        if self.channel_var.get() == "lan":
+            path = (filedialog.askdirectory(title="选择本地目标文件夹")
+                    if self.dir_var.get() == "pull"
+                    else self._ask_rel_path("选择对端目标目录", self.dst_var.get()))
+        elif self.dir_var.get() == "pull":
             path = filedialog.askdirectory(title="选择本地目标文件夹")
         else:
             path = self.ask_device_path("选择设备目标目录",
@@ -882,21 +1132,29 @@ class AdbPushGUI:
     def _on_direction(self) -> None:
         """方向切换时更新按钮文案，并给出合理的默认目标路径。"""
         pull = (self.dir_var.get() == "pull")
+        lan = (self.channel_var.get() == "lan")
         dst = self.dst_var.get().strip()
         if pull:
             self.start_btn.configure(text="开始拉取")
-            self.src_file_btn.configure(text="设备文件")
-            self.src_dir_btn.configure(text="设备目录")
+            self.src_file_btn.configure(text="对端文件" if lan else "设备文件")
+            self.src_dir_btn.configure(text="对端目录" if lan else "设备目录")
             self.dst_browse_btn.configure(text="本地目录…")
-            # 目标原本是设备路径（以 / 开头）或为空时，换成桌面
-            if not dst or dst.startswith("/"):
+            # 目标原本是远端路径或为空时，换成桌面
+            is_local_abs = os.path.isabs(dst) or (len(dst) > 1 and dst[1] == ":")
+            if lan:
+                if not dst or not is_local_abs:
+                    self.dst_var.set(os.path.expanduser("~\\Desktop"))
+            elif not dst or dst.startswith("/"):
                 self.dst_var.set(os.path.expanduser("~\\Desktop"))
         else:
             self.start_btn.configure(text="开始推送")
             self.src_file_btn.configure(text="本地文件")
             self.src_dir_btn.configure(text="本地文件夹")
-            self.dst_browse_btn.configure(text="设备目录…")
-            if not dst or not dst.startswith("/"):
+            self.dst_browse_btn.configure(text="对端目录…" if lan else "设备目录…")
+            if lan:
+                if not dst or dst.startswith("/"):
+                    self.dst_var.set("Download")
+            elif not dst or not dst.startswith("/"):
                 self.dst_var.set("/sdcard/Download/")
 
     def start_push(self) -> None:
@@ -907,6 +1165,32 @@ class AdbPushGUI:
         if not st["dst"]:
             messagebox.showerror("错误", "请填写目标路径。")
             return
+
+        # 网卡通道：路径是「对端共享目录下的相对路径」，与 ADB 的设备绝对路径不同
+        if st["channel"] == "lan":
+            if not st["lan_host"]:
+                messagebox.showerror(
+                    "缺少对端地址",
+                    "网卡直连需要填写对端 IP（或点「搜索对端」）。\n"
+                    "对端可以是安卓版 App，也可以是另一台开了共享的电脑。")
+                return
+            if st["direction"] == "push" and not os.path.exists(st["src"]):
+                messagebox.showerror("错误", "本地源路径不存在。")
+                return
+            if st["direction"] == "pull":
+                try:
+                    os.makedirs(st["dst"], exist_ok=True)
+                except OSError as exc:
+                    messagebox.showerror("错误", "无法创建本地目标目录：{}".format(exc))
+                    return
+            self.cancel_requested = False
+            self.pb_var.set(0)
+            self.prog_var.set("—")
+            self.speed_var.set("—")
+            self.cur_var.set("准备中…")
+            self.run_bg(self._push_job_lan, st)
+            return
+
         # 方向与路径类型必须匹配，否则会得到「源为空或不可读」这类难懂的报错
         if st["direction"] == "pull":
             if not st["src"].startswith("/"):
@@ -996,11 +1280,62 @@ class AdbPushGUI:
             on_log=on_log, on_progress=on_progress, reconnect=reconnect,
             cancel_flag=lambda: self.cancel_requested,
         )
+        self._finish_stats(stats)
+
+    def _finish_stats(self, stats) -> None:
+        """传输结束：进度条收尾 + 汇总。"""
         self.events.put(("progress", 100, stats.summary(), None))
         self.events.put(("status", "传输结束：" + stats.summary()))
         level = "ok" if not (stats.failed or stats.verify_failed) else "err"
         self.log("传输结束：" + stats.summary(), level)
         self.events.put(("info", "传输结束\n\n" + stats.summary()))
+
+    def _push_job_lan(self, st: dict) -> None:
+        """网卡通道传输（对端为安卓版 App 或另一台电脑）。"""
+        try:
+            port = int(st["lan_port"] or L.DEFAULT_PORT)
+        except ValueError:
+            port = L.DEFAULT_PORT
+
+        def on_log(msg: str) -> None:
+            tag = ""
+            if msg.startswith("[失败") or msg.startswith("[错误"):
+                tag = "err"
+            elif msg.startswith("[跳过") or msg.startswith("[警告") or msg.startswith("[校验"):
+                tag = "warn"
+            elif msg.startswith("[完成"):
+                tag = "ok"
+            self.log(msg, tag)
+
+        def on_progress(done, total, dbytes, tbytes, pct, speed=0.0):
+            pct_total = int(dbytes / tbytes * 100) if tbytes else pct
+            remain = max(0, tbytes - dbytes)
+            eta = (remain / speed) if (speed > 0 and remain > 0) else None
+            self.events.put((
+                "progress", pct_total,
+                "{}/{} 个文件｜{}/{}".format(done, total, U._human(dbytes), U._human(tbytes)),
+                "{}/s｜剩余 {}".format(U._human(int(speed)), U.human_duration(eta))))
+
+        try:
+            jobs = max(1, int(st["jobs"]))
+        except (TypeError, ValueError):
+            jobs = T.DEFAULT_JOBS
+
+        try:
+            stats = L.sync_lan(
+                st["lan_host"], st["src"], st["dst"],
+                port=port, token=st["lan_token"],
+                direction=st["direction"],
+                mode=st["mode"], verify=st["verify"],
+                resume=st["resume"], jobs=jobs, dry_run=st["dry_run"],
+                on_log=on_log, on_progress=on_progress,
+                cancel_flag=lambda: self.cancel_requested,
+            )
+        except L.LanError as exc:
+            self.log("[错误] {}".format(exc), "err")
+            self.events.put(("error", str(exc)))
+            return
+        self._finish_stats(stats)
 
 
 def main() -> None:
