@@ -1,5 +1,5 @@
 {
-  "_说明": "把本文件改名为 config.json 即可被工具自动读取。所有路径使用正斜杠 '/'。",
+  "_说明": "复制为 config.json 后生效。路径统一用正斜杠 '/'。",
   "devices": [
     { "address": "192.168.1.100:5555", "note": "示例设备" }
   ],
@@ -17,19 +17,20 @@
     "jobs": 4,
     "parallel_threshold_mb": 64
   },
+  "lan": {
+    "_说明": "网卡直连：share_dir 是给安卓版/另一台电脑读写的目录，相对路径以程序目录为基准；token 非空时对端请求必须带同一个令牌",
+    "port": 47820,
+    "share_dir": "shared",
+    "token": "",
+    "auto_start": false,
+    "name": ""
+  },
   "jobs": [
     {
       "source": "D:/我的文件",
       "target": "/sdcard/Download/我的文件",
       "direction": "push",
       "mode": "diff",
-      "verify": "hash"
-    },
-    {
-      "source": "D:/GAME/ZenlessZoneZero Game",
-      "target": "/sdcard/PC_GAME/",
-      "direction": "push",
-      "mode": "overwrite",
       "verify": "hash"
     },
     {
